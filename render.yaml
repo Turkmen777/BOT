@@ -1,1 +1,7 @@
-startCommand: python bot_with_port.py
+services:
+  - type: web
+    name: telegram-parikara-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot_final.py
