@@ -4,8 +4,8 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboard
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes, ConversationHandler
 
 # ========== НАСТРОЙКИ ==========
-BOT_TOKEN = "8123803682:AAFOgF4Ssp95WkxRwQcjfao9qnMnA6pMVQI"  # ⚠️ ВАШ ТОКЕН
-GROUP_CHAT_ID = -1003663534213
+BOT_TOKEN = "8741918027:AAEqpPPZBDO54UZcmxyJb_U4gfuVqc97j5w"  # ⚠️ ВАШ ТОКЕН
+GROUP_CHAT_ID = -1003759188641
 ADMIN_IDS = [8444800411]
 MIN_AMOUNT = 50
 
@@ -203,4 +203,5 @@ def main():
     application.run_polling()
 
 if __name__ == '__main__':
+
     main()
