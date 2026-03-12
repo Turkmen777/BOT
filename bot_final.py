@@ -24,7 +24,7 @@ def run_flask():
 # ========== НАСТРОЙКИ БОТА ==========
 BOT_TOKEN = "8741918027:AAEqpPPZBDO54UZcmxyJb_U4gfuVqc97j5w"
 GROUP_CHAT_ID = -1003759188641
-SUPPORT_USERNAME = "@astra_kassa"  # Контакт поддержки
+SUPPORT_USERNAME = "@astra_kassa"
 
 # Состояния для разговоров
 (PHONE_INPUT, AMOUNT_INPUT, WITHDRAW_PHONE_INPUT, 
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Хранилище данных
 user_data = {}
 applications = {}
-app_counter = 1000
+app_counter = 1000  # Это будет увеличиваться, никогда не сбрасывается
 
 # ========== ФУНКЦИИ ДЛЯ ПРОВЕРКИ ==========
 def validate_parikara_id(text):
@@ -47,7 +47,7 @@ def validate_amount(text):
     """Проверяет сумму (минимум 30 TMT)"""
     if re.match(r'^\d+$', text):
         amount = int(text)
-        if amount >= 20:
+        if amount >= 30:
             return True
     return False
 
@@ -61,16 +61,31 @@ def format_phone(text):
     clean_text = re.sub(r'[\s\-\(\)]', '', text)
     return f"+993 {clean_text[:2]} {clean_text[2:5]} {clean_text[5:]}"
 
+# ========== ФУНКЦИЯ СБРОСА ДАННЫХ ПОЛЬЗОВАТЕЛЯ ==========
+def reset_user_data(user_id):
+    """Полностью очищает данные пользователя"""
+    if user_id in user_data:
+        del user_data[user_id]
+
 # ========== КОМАНДА /start ==========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка команды /start"""
+    """Обработка команды /start - ПОЛНОСТЬЮ СБРАСЫВАЕТ ВСЁ"""
+    user_id = update.effective_user.id
+    
+    # ПОЛНОСТЬЮ ОЧИЩАЕМ ВСЕ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ
+    reset_user_data(user_id)
+    
+    # Очищаем context.user_data если есть
+    if context.user_data:
+        context.user_data.clear()
+    
     user = update.effective_user
     
-    # ТУРКМЕНСКИЕ КНОПКИ (ТЕПЕРЬ С КНОПКОЙ ПОДДЕРЖКИ)
+    # ТУРКМЕНСКИЕ КНОПКИ
     keyboard = [
         [KeyboardButton("💰 Hasaby doldurmak")],
         [KeyboardButton("💸 Pul çykarmak")],
-        [KeyboardButton("🆘 Ýardam")]  # Новая кнопка поддержки
+        [KeyboardButton("🆘 Ýardam")]
     ]
     
     welcome_text = (
@@ -97,7 +112,6 @@ async def support_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"İş wagty: 24/7"
     )
     
-    # Создаем inline кнопку для быстрого перехода
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📨 Habar ýazmak", url=f"https://t.me/{SUPPORT_USERNAME.replace('@', '')}")]
     ])
@@ -112,6 +126,10 @@ async def support_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def deposit_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало пополнения"""
     user_id = update.effective_user.id
+    
+    # Сбрасываем старые данные перед новой заявкой
+    reset_user_data(user_id)
+    
     user_data[user_id] = {'action': 'deposit'}
     await update.message.reply_text("🔑 Parikara ID-nizi ýazyň:\n(Diňe sanlar)")
     return PHONE_INPUT
@@ -126,7 +144,7 @@ async def deposit_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"✅ ID kabul edildi: {text}\n\n"
             "💵 Näçe TMT doldurmaly?\n"
-            "(Iň az 20 TMT, diňe san)"
+            "(Iň az 30 TMT, diňe san)"
         )
         return AMOUNT_INPUT
     else:
@@ -143,7 +161,7 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         amount = text
         user_data[user_id]['amount'] = amount
         app_id = app_counter
-        app_counter += 1
+        app_counter += 1  # УВЕЛИЧИВАЕМ, НИКОГДА НЕ СБРАСЫВАЕМ
         
         # Получаем username (если есть) или имя
         user = update.effective_user
@@ -191,16 +209,21 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🆘 Kömek gerek bolsa: {SUPPORT_USERNAME}"
         )
         
-        del user_data[user_id]
+        # Очищаем данные после успешной заявки
+        reset_user_data(user_id)
         return ConversationHandler.END
     else:
-        await update.message.reply_text("❌ Ýalňyş summa! Iň az 50 TMT bolmaly.\nTäzeden ýazyň:")
+        await update.message.reply_text("❌ Ýalňyş summa! Iň az 30 TMT bolmaly.\nTäzeden ýazyň:")
         return AMOUNT_INPUT
 
 # ========== ВЫВОД СРЕДСТВ ==========
 async def withdraw_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начало вывода"""
     user_id = update.effective_user.id
+    
+    # Сбрасываем старые данные перед новой заявкой
+    reset_user_data(user_id)
+    
     user_data[user_id] = {'action': 'withdraw'}
     await update.message.reply_text("🔑 Parikara ID-nizi ýazyň:\n(Diňe sanlar)")
     return WITHDRAW_PHONE_INPUT
@@ -250,7 +273,7 @@ async def withdraw_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         username = user.username
         app_id = app_counter
-        app_counter += 1
+        app_counter += 1  # УВЕЛИЧИВАЕМ, НИКОГДА НЕ СБРАСЫВАЕМ
         
         # Формируем строку с username или именем
         if username:
@@ -301,7 +324,8 @@ async def withdraw_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🆘 Kömek gerek bolsa: {SUPPORT_USERNAME}"
         )
         
-        del user_data[user_id]
+        # Очищаем данные после успешной заявки
+        reset_user_data(user_id)
         return ConversationHandler.END
     else:
         await update.message.reply_text(
@@ -550,8 +574,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена действия"""
     user_id = update.effective_user.id
-    if user_id in user_data:
-        del user_data[user_id]
+    
+    # Полностью очищаем данные пользователя
+    reset_user_data(user_id)
+    if context.user_data:
+        context.user_data.clear()
+        
     await update.message.reply_text("❌ Amal ýatyryldy.\nTäzeden başlamak üçin /start basyň.")
     return ConversationHandler.END
 
@@ -567,6 +595,7 @@ def main():
     print("📱 Işe başlady! 24/7 işleýär")
     print("💰 KNOpkalar: 'Hasaby doldurmak', 'Pul çykarmak', '🆘 Ýardam'")
     print(f"👥 Ýardam: {SUPPORT_USERNAME}")
+    print(f"📊 Nomeraşdyryş: {app_counter}-den başlaýar we hemişe artýar")
     print("=" * 60)
     
     # Создаем приложение бота
@@ -616,5 +645,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
