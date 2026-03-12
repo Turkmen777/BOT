@@ -492,7 +492,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=app['user_id'],
             text=(
-                f"✅ <b>PLATIO TASSYKLANDY #{app_id}</b>\n\n"
+                f"✅ <b>SARGYT TASSYKLANDY #{app_id}</b>\n\n"
                 f"👤 Klient: {user_display}\n"
                 f"💰 Summa: {app['amount']} TMT\n"
                 f"✅ Tassyklandy: Admin\n\n"
@@ -503,7 +503,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Обновляем сообщение в группе
         await query.edit_message_caption(
-            caption=query.message.caption + f"\n\n✅ <b>PLATIO TASSYKLANDY #{app_id}</b>\n\n👤 Klient: {user_display}\n💰 Summa: {app['amount']} TMT\n✅ Tassyklandy: Admin",
+            caption=query.message.caption + f"\n\n✅ <b>SARGYT TASSYKLANDY #{app_id}</b>\n\n👤 Klient: {user_display}\n💰 Summa: {app['amount']} TMT\n✅ Tassyklandy: Admin",
             parse_mode='HTML'
         )
         
@@ -616,3 +616,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
