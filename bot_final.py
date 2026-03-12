@@ -58,7 +58,7 @@ def validate_phone(text):
 def format_phone(text):
     """Добавляет +993 к 8 цифрам"""
     clean_text = re.sub(r'[\s\-\(\)]', '', text)
-    return f"+993{clean_text}"
+    return f"+993 {clean_text[:2]} {clean_text[2:5]} {clean_text[5:]}"
 
 # ========== КОМАНДА /start ==========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -67,8 +67,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ТУРКМЕНСКИЕ КНОПКИ
     keyboard = [
-        [KeyboardButton("💰 Hasaby doldurmak")],  # Пополнить счет
-        [KeyboardButton("💸 Pul çykarmak")]       # Вывести деньги
+        [KeyboardButton("💰 Hasaby doldurmak")],
+        [KeyboardButton("💸 Pul çykarmak")]
     ]
     
     welcome_text = (
@@ -125,36 +125,38 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'id': app_id,
             'user_id': user_id,
             'username': update.effective_user.username or "ýok",
+            'first_name': update.effective_user.first_name,
             'type': 'deposit',
             'parikara_id': user_data[user_id]['parikara_id'],
             'amount': amount,
-            'time': datetime.now().strftime("%d.%m.%Y %H:%M"),
-            'status': 'waiting_phone'  # Ожидает номер от админа
+            'time': datetime.now().strftime("%H:%M %d.%m.%Y"),
+            'status': 'waiting_phone'
         }
         
-        # Отправляем в группу
+        # Отправляем в группу (как на скриншоте)
         user = update.effective_user
         username = user.username or "ýok"
         
         group_message = (
-            f"🟢 TÄZE HAÝYŞ: HASABY DOLDURMAK #{app_id}\n\n"
-            f"👤 Ulanyjy: @{username}\n"
-            f"🆔 ID: {user_data[user_id]['parikara_id']}\n"
+            f"🆕 <b>TÄZE HAÝYŞ #{app_id}</b>\n\n"
+            f"👤 Klient: {user.first_name}\n"
+            f"📞 ID Parikara: {user_data[user_id]['parikara_id']}\n"
             f"💰 Summa: {amount} TMT\n"
             f"⏰ Wagt: {applications[app_id]['time']}\n\n"
-            f"📞 Rekwizitleri ugratmak üçin:\n"
-            f"Bu habara jogap edip 8 san ýazyň (mysal: 65656565)"
+            f"<b>Telefon nomerini ugratmak üçin:</b>\n"
+            f"(8 san, mysal: 65656565)"
         )
         
         await context.bot.send_message(
             chat_id=GROUP_CHAT_ID, 
-            text=group_message
+            text=group_message,
+            parse_mode='HTML'
         )
         
+        # Отправляем клиенту (как на скриншоте)
         await update.message.reply_text(
             f"✅ Haýyşyňyz #{app_id} kabul edildi!\n\n"
-            "📞 Töleg maglumatlary 10 minudyň içinde ugradylar.\n"
-            "Tölegiňizi geçireniňizden soň, skrinşoty ugratmagy unutmaň."
+            "📞 Rekwizitleri garaşyň..."
         )
         
         del user_data[user_id]
@@ -223,39 +225,40 @@ async def withdraw_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'id': app_id,
             'user_id': user_id,
             'username': username,
+            'first_name': user.first_name,
             'type': 'withdraw',
             'parikara_id': user_data[user_id]['parikara_id'],
             'amount': user_data[user_id]['amount'],
             'phone': phone,
-            'time': datetime.now().strftime("%d.%m.%Y %H:%M"),
-            'status': 'waiting_confirm'  # Ожидает подтверждения
+            'time': datetime.now().strftime("%H:%M %d.%m.%Y"),
+            'status': 'waiting_confirm'
         }
         
         group_message = (
-            f"🔴 TÄZE HAÝYŞ: PUL ÇYKARMAK #{app_id}\n\n"
-            f"👤 Ulanyjy: @{username}\n"
-            f"🆔 ID: {user_data[user_id]['parikara_id']}\n"
+            f"🔴 <b>TÄZE HAÝYŞ: PUL ÇYKARMAK #{app_id}</b>\n\n"
+            f"👤 Klient: {user.first_name}\n"
+            f"📞 ID Parikara: {user_data[user_id]['parikara_id']}\n"
             f"💰 Summa: {user_data[user_id]['amount']} TMT\n"
             f"📞 Telefon: {phone}\n"
             f"⏰ Wagt: {applications[app_id]['time']}\n\n"
-            f"✅ Pul geçirilenden soň aşakdaky düwmä basyň:"
+            f"<b>Pul geçirilenden soň:</b>"
         )
         
-        # Кнопки для подтверждения вывода
+        # Кнопка для подтверждения вывода
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Tassyklamak", callback_data=f"confirm_withdraw_{app_id}")]
+            [InlineKeyboardButton("✅ Töleg tassykla", callback_data=f"confirm_withdraw_{app_id}")]
         ])
         
         await context.bot.send_message(
             chat_id=GROUP_CHAT_ID, 
             text=group_message,
+            parse_mode='HTML',
             reply_markup=keyboard
         )
         
         await update.message.reply_text(
             f"✅ Haýyşyňyz #{app_id} kabul edildi!\n\n"
-            "💸 Pul çykarmak haýyşyňyz işlenilýär.\n"
-            "Administratorlar tizara habarlaşarlar."
+            "💸 Pul çykarmak haýyşyňyz işlenilýär."
         )
         
         del user_data[user_id]
@@ -286,24 +289,30 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 app = applications[app_id]
                 admin_message = update.message.text.strip()
                 
-                # ЕСЛИ 8 ЦИФР - ОТПРАВЛЯЕМ РЕКВИЗИТЫ (для пополнения)
+                # ЕСЛИ 8 ЦИФР - ОТПРАВЛЯЕМ РЕКВИЗИТЫ (как на скриншоте)
                 if re.match(r'^\d{8}$', admin_message) and app['type'] == 'deposit':
-                    phone = f"+993{admin_message}"
+                    phone = format_phone(admin_message)
                     
-                    # Отправляем клиенту
+                    # Отправляем клиенту (как на скриншоте)
                     await context.bot.send_message(
                         chat_id=app['user_id'],
                         text=(
-                            f"📞 TÖLEG MAGLUMATLARY #{app_id}\n\n"
-                            f"Pul geçirmeli nomer:\n"
-                            f"<code>{phone}</code>\n\n"
+                            f"📞 <b>REKWIZITLER #1000</b>\n\n"
+                            f"💳 Nomer: <code>{phone}</code>\n"
                             f"💰 Summa: {app['amount']} TMT\n\n"
-                            f"Pul geçireniňizden soň, skrinşoty ugradyň."
+                            f"Töleg geçireniňizden soň skrinşoty ugradyň!"
                         ),
                         parse_mode='HTML'
                     )
                     
-                    await update.message.reply_text(f"✅ {phone} nomeri ugradyldy")
+                    # Отправляем подтверждение в группу (как на скриншоте)
+                    await update.message.reply_text(
+                        f"✔ Rekwizitler ugradyldy #{app_id}\n\n"
+                        f"👤 Klient: {app['first_name']}\n"
+                        f"📞 Nomer: {phone}\n"
+                        f"💰 Summa: {app['amount']} TMT\n\n"
+                        f"Skrinşot garaşylýar..."
+                    )
                     
                     # Обновляем статус
                     app['status'] = 'waiting_screenshot'
@@ -321,7 +330,7 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Ищем активную заявку пользователя
         user_app = None
         for app_id, app in applications.items():
-            if app['user_id'] == user.id and app['status'] in ['waiting_screenshot', 'waiting_confirm']:
+            if app['user_id'] == user.id and app['status'] == 'waiting_screenshot':
                 user_app = app
                 break
         
@@ -331,17 +340,14 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Сохраняем file_id скриншота
             applications[app_id]['screenshot_id'] = file_id
             
-            # Отправляем в группу с кнопками подтверждения
+            # Отправляем в группу с кнопкой подтверждения (как на скриншоте)
             keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("✅ Tassyklamak", callback_data=f"approve_{app_id}"),
-                    InlineKeyboardButton("❌ Ret etmek", callback_data=f"reject_{app_id}")
-                ]
+                [InlineKeyboardButton("✅ Töleg tassykla", callback_data=f"approve_{app_id}")]
             ])
             
             caption = (
-                f"🖼 TÄZE SKRINŞOT #{app_id}\n\n"
-                f"👤 Ulanyjy: @{username}\n"
+                f"🖼 <b>Skrinşot #1000</b>\n\n"
+                f"👤 Klient: {user_app['first_name']}\n"
                 f"💰 Summa: {user_app['amount']} TMT"
             )
             
@@ -349,6 +355,7 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=GROUP_CHAT_ID,
                 photo=file_id,
                 caption=caption,
+                parse_mode='HTML',
                 reply_markup=keyboard
             )
             
@@ -367,32 +374,33 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Разбираем callback_data
     data = query.data.split('_')
     action = data[0]
-    app_id = int(data[1])
     
-    if app_id not in applications:
-        await query.edit_message_text("❌ Bu haýyş tapylmady")
-        return
-    
-    app = applications[app_id]
-    
-    # ===== КНОПКИ ДЛЯ СКРИНШОТОВ =====
     if action == 'approve':
-        # Подтверждение скриншота
+        app_id = int(data[1])
+        
+        if app_id not in applications:
+            await query.edit_message_caption("❌ Bu haýyş tapylmady")
+            return
+        
+        app = applications[app_id]
         app['status'] = 'completed'
         
-        # Отправляем сообщение клиенту
+        # Отправляем сообщение клиенту (как на скриншоте)
         await context.bot.send_message(
             chat_id=app['user_id'],
             text=(
-                f"✅ <b>OPERASIÝA TASSYKLANDY #{app_id}</b>\n\n"
-                f"💰 Summa: {app['amount']} TMT\n\n"
-                f"Töleg üçin sag boluň! 🤝"
+                f"✅ <b>PLATIO TASSYKLANDY #{app_id}</b>\n\n"
+                f"👤 Klient: {app['first_name']}\n"
+                f"💰 Summa: {app['amount']} TMT\n"
+                f"✅ Tassyklandy: Admin"
             ),
             parse_mode='HTML'
         )
         
+        # Обновляем сообщение в группе (как на скриншоте)
         await query.edit_message_caption(
-            caption=query.message.caption + "\n\n✅ TASSYKLANDY"
+            caption=query.message.caption + f"\n\n✅ <b>PLATIO TASSYKLANDY #{app_id}</b>\n\n👤 Klient: {app['first_name']}\n💰 Summa: {app['amount']} TMT\n✅ Tassyklandy: Admin",
+            parse_mode='HTML'
         )
         
         # Отправляем подтверждение в группу
@@ -401,33 +409,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"✅ #{app_id} tassyklanyldy"
         )
     
-    elif action == 'reject':
-        # Отклонение скриншота
-        app['status'] = 'rejected'
+    elif action == 'confirm' and data[1] == 'withdraw':
+        app_id = int(data[2])
         
-        # Отправляем сообщение клиенту
-        await context.bot.send_message(
-            chat_id=app['user_id'],
-            text=(
-                f"❌ <b>SKRINŞOT KABUL EDILMEDI #{app_id}</b>\n\n"
-                f"Tölegiňiz tassyklanmady. Administratorlar bilen habarlaşyň."
-            ),
-            parse_mode='HTML'
-        )
+        if app_id not in applications:
+            await query.edit_message_text("❌ Bu haýyş tapylmady")
+            return
         
-        await query.edit_message_caption(
-            caption=query.message.caption + "\n\n❌ RET EDILDI"
-        )
-        
-        # Отправляем подтверждение в группу
-        await context.bot.send_message(
-            chat_id=GROUP_CHAT_ID,
-            text=f"❌ #{app_id} ret edildi"
-        )
-    
-    # ===== КНОПКИ ДЛЯ ВЫВОДА =====
-    elif action == 'confirm' and data[2] == 'withdraw':
-        # Подтверждение вывода
+        app = applications[app_id]
         app['status'] = 'completed'
         
         await context.bot.send_message(
@@ -441,7 +430,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         await query.edit_message_text(
-            text=query.message.text + "\n\n✅ TASSYKLANDY"
+            text=query.message.text + f"\n\n✅ <b>TASSYKLANDY #{app_id}</b>",
+            parse_mode='HTML'
         )
 
 # ========== ОТМЕНА ==========
@@ -466,7 +456,7 @@ def main():
     print("💰 KNOpkalar: 'Hasaby doldurmak' we 'Pul çykarmak'")
     print("👥 ADMIN FUNKSIÝALARY:")
     print("   • 8 san ýaz -> +993 goşulyp müşderä gidýär")
-    print("   • Skrinşot gelende: ✅ Tassyklamak / ❌ Ret etmek")
+    print("   • Skrinşot gelende: ✅ Töleg tassykla")
     print("=" * 60)
     
     # Создаем приложение бота
