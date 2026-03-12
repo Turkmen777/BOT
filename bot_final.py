@@ -47,7 +47,7 @@ def validate_amount(text):
     """Проверяет сумму (минимум 30 TMT)"""
     if re.match(r'^\d+$', text):
         amount = int(text)
-        if amount >= 30:
+        if amount >= 20:
             return True
     return False
 
@@ -126,7 +126,7 @@ async def deposit_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"✅ ID kabul edildi: {text}\n\n"
             "💵 Näçe TMT doldurmaly?\n"
-            "(Iň az 30 TMT, diňe san)"
+            "(Iň az 20 TMT, diňe san)"
         )
         return AMOUNT_INPUT
     else:
@@ -194,7 +194,7 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del user_data[user_id]
         return ConversationHandler.END
     else:
-        await update.message.reply_text("❌ Ýalňyş summa! Iň az 30 TMT bolmaly.\nTäzeden ýazyň:")
+        await update.message.reply_text("❌ Ýalňyş summa! Iň az 50 TMT bolmaly.\nTäzeden ýazyň:")
         return AMOUNT_INPUT
 
 # ========== ВЫВОД СРЕДСТВ ==========
@@ -616,4 +616,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
