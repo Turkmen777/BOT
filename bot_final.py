@@ -120,12 +120,16 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         app_id = app_counter
         app_counter += 1
         
+        # Получаем username (если есть) или имя
+        user = update.effective_user
+        username = user.username
+        
         # Сохраняем заявку
         applications[app_id] = {
             'id': app_id,
             'user_id': user_id,
-            'username': update.effective_user.username or "ýok",
-            'first_name': update.effective_user.first_name,
+            'username': username,
+            'first_name': user.first_name,
             'type': 'deposit',
             'parikara_id': user_data[user_id]['parikara_id'],
             'amount': amount,
@@ -133,13 +137,16 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'status': 'waiting_phone'
         }
         
-        # Отправляем в группу
-        user = update.effective_user
-        username = user.username or "ýok"
+        # Формируем строку с username или именем
+        if username:
+            user_display = f"@{username}"
+        else:
+            user_display = user.first_name
         
+        # Отправляем в группу
         group_message = (
             f"🆕 <b>TÄZE HAÝYŞ #{app_id}</b>\n\n"
-            f"👤 Klient: {user.first_name}\n"
+            f"👤 Klient: {user_display}\n"
             f"📞 ID Parikara: {user_data[user_id]['parikara_id']}\n"
             f"💰 Summa: {amount} TMT\n"
             f"⏰ Wagt: {applications[app_id]['time']}\n\n"
@@ -215,9 +222,15 @@ async def withdraw_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if validate_phone(text):
         phone = format_phone(text)
         user = update.effective_user
-        username = user.username or "ýok"
+        username = user.username
         app_id = app_counter
         app_counter += 1
+        
+        # Формируем строку с username или именем
+        if username:
+            user_display = f"@{username}"
+        else:
+            user_display = user.first_name
         
         # Сохраняем заявку
         applications[app_id] = {
@@ -225,6 +238,7 @@ async def withdraw_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'user_id': user_id,
             'username': username,
             'first_name': user.first_name,
+            'user_display': user_display,
             'type': 'withdraw',
             'parikara_id': user_data[user_id]['parikara_id'],
             'amount': user_data[user_id]['amount'],
@@ -235,7 +249,7 @@ async def withdraw_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         group_message = (
             f"🔴 <b>TÄZE HAÝYŞ: PUL ÇYKARMAK #{app_id}</b>\n\n"
-            f"👤 Klient: {user.first_name}\n"
+            f"👤 Klient: {user_display}\n"
             f"📞 ID Parikara: {user_data[user_id]['parikara_id']}\n"
             f"💰 Summa: {user_data[user_id]['amount']} TMT\n"
             f"📞 Telefon: {phone}\n"
@@ -310,7 +324,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
                         # Отправляем подтверждение в группу
                         await update.message.reply_text(
                             f"✔ Rekwizitler ugradyldy #{app_id}\n\n"
-                            f"👤 Klient: {app['first_name']}\n"
+                            f"👤 Klient: {app.get('user_display', app['first_name'])}\n"
                             f"📞 Nomer: {phone}\n"
                             f"💰 Summa: {app['amount']} TMT\n\n"
                             f"Skrinşot garaşylýar..."
@@ -354,7 +368,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 # Отправляем подтверждение в группу
                 await update.message.reply_text(
                     f"✔ Rekwizitler ugradyldy #{last_app['id']}\n\n"
-                    f"👤 Klient: {last_app['first_name']}\n"
+                    f"👤 Klient: {last_app.get('user_display', last_app['first_name'])}\n"
                     f"📞 Nomer: {phone}\n"
                     f"💰 Summa: {last_app['amount']} TMT\n\n"
                     f"Skrinşot garaşylýar..."
@@ -373,7 +387,13 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo = update.message.photo[-1]
         file_id = photo.file_id
         user = update.effective_user
-        username = user.username or "ýok"
+        username = user.username
+        
+        # Формируем строку с username или именем
+        if username:
+            user_display = f"@{username}"
+        else:
+            user_display = user.first_name
         
         # Ищем активную заявку пользователя
         user_app = None
@@ -395,7 +415,7 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             caption = (
                 f"🖼 <b>Skrinşot #{app_id}</b>\n\n"
-                f"👤 Klient: {user_app['first_name']}\n"
+                f"👤 Klient: {user_display}\n"
                 f"💰 Summa: {user_app['amount']} TMT"
             )
             
@@ -433,12 +453,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         app = applications[app_id]
         app['status'] = 'completed'
         
+        # Получаем display имени для клиента
+        if app.get('username'):
+            user_display = f"@{app['username']}"
+        else:
+            user_display = app['first_name']
+        
         # Отправляем сообщение клиенту
         await context.bot.send_message(
             chat_id=app['user_id'],
             text=(
                 f"✅ <b>PLATIO TASSYKLANDY #{app_id}</b>\n\n"
-                f"👤 Klient: {app['first_name']}\n"
+                f"👤 Klient: {user_display}\n"
                 f"💰 Summa: {app['amount']} TMT\n"
                 f"✅ Tassyklandy: Admin"
             ),
@@ -447,7 +473,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Обновляем сообщение в группе
         await query.edit_message_caption(
-            caption=query.message.caption + f"\n\n✅ <b>PLATIO TASSYKLANDY #{app_id}</b>\n\n👤 Klient: {app['first_name']}\n💰 Summa: {app['amount']} TMT\n✅ Tassyklandy: Admin",
+            caption=query.message.caption + f"\n\n✅ <b>PLATIO TASSYKLANDY #{app_id}</b>\n\n👤 Klient: {user_display}\n💰 Summa: {app['amount']} TMT\n✅ Tassyklandy: Admin",
             parse_mode='HTML'
         )
         
@@ -467,10 +493,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         app = applications[app_id]
         app['status'] = 'completed'
         
+        # Получаем display имени для клиента
+        if app.get('username'):
+            user_display = f"@{app['username']}"
+        else:
+            user_display = app['first_name']
+        
         await context.bot.send_message(
             chat_id=app['user_id'],
             text=(
                 f"✅ <b>PUL ÇYKARYLDY #{app_id}</b>\n\n"
+                f"👤 Klient: {user_display}\n"
                 f"💰 Summa: {app['amount']} TMT\n\n"
                 f"Hyzmat üçin sag boluň! 🤝"
             ),
@@ -478,7 +511,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         await query.edit_message_text(
-            text=query.message.text + f"\n\n✅ <b>TASSYKLANDY #{app_id}</b>",
+            text=query.message.text + f"\n\n✅ <b>TASSYKLANDY #{app_id}</b>\n\n👤 Klient: {user_display}\n💰 Summa: {app['amount']} TMT",
             parse_mode='HTML'
         )
 
@@ -503,8 +536,8 @@ def main():
     print("📱 Işe başlady! 24/7 işleýär")
     print("💰 KNOpkalar: 'Hasaby doldurmak' we 'Pul çykarmak'")
     print("👥 ADMIN FUNKSIÝALARY:")
-    print("   • 8 san ýazsaňyz (jaap bermeden) -> iň soňky haýyşa gidýär")
-    print("   • 8 san ýazyp jaap berseňiz -> şol haýyşa gidýär")
+    print("   • 8 san ýazsaňyz -> rekwizitler gidýär")
+    print("   • Skrinşot gelende: ✅ Töleg tassykla")
     print("=" * 60)
     
     # Создаем приложение бота
