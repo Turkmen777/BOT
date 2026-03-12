@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Хранилище данных
 user_data = {}
 applications = {}
-app_counter = 1000  # Это будет увеличиваться, никогда не сбрасывается
+app_counter = 1000  # ГЛОБАЛЬНЫЙ СЧЕТЧИК - НИКОГДА НЕ СБРАСЫВАЕТСЯ
 
 # ========== ФУНКЦИИ ДЛЯ ПРОВЕРКИ ==========
 def validate_parikara_id(text):
@@ -66,6 +66,7 @@ def reset_user_data(user_id):
     """Полностью очищает данные пользователя"""
     if user_id in user_data:
         del user_data[user_id]
+        logger.info(f"Данные пользователя {user_id} очищены")
 
 # ========== КОМАНДА /start ==========
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -112,6 +113,7 @@ async def support_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"İş wagty: 24/7"
     )
     
+    # Создаем inline кнопку для быстрого перехода
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📨 Habar ýazmak", url=f"https://t.me/{SUPPORT_USERNAME.replace('@', '')}")]
     ])
@@ -124,7 +126,7 @@ async def support_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== ПОПОЛНЕНИЕ СЧЁТА ==========
 async def deposit_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало пополнения"""
+    """Начало пополнения - СБРАСЫВАЕТ СТАРЫЕ ДАННЫЕ"""
     user_id = update.effective_user.id
     
     # Сбрасываем старые данные перед новой заявкой
@@ -138,6 +140,11 @@ async def deposit_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получение ID"""
     user_id = update.effective_user.id
     text = update.message.text.strip()
+    
+    # Проверяем, есть ли сессия пользователя
+    if user_id not in user_data or user_data[user_id].get('action') != 'deposit':
+        await update.message.reply_text("❌ Başdan başlamak üçin /start basyň.")
+        return ConversationHandler.END
     
     if validate_parikara_id(text):
         user_data[user_id]['parikara_id'] = text
@@ -157,11 +164,16 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
     
+    # Проверяем, есть ли сессия пользователя
+    if user_id not in user_data or user_data[user_id].get('action') != 'deposit':
+        await update.message.reply_text("❌ Başdan başlamak üçin /start basyň.")
+        return ConversationHandler.END
+    
     if validate_amount(text):
         amount = text
         user_data[user_id]['amount'] = amount
         app_id = app_counter
-        app_counter += 1  # УВЕЛИЧИВАЕМ, НИКОГДА НЕ СБРАСЫВАЕМ
+        app_counter += 1  # УВЕЛИЧИВАЕМ ГЛОБАЛЬНЫЙ СЧЕТЧИК
         
         # Получаем username (если есть) или имя
         user = update.effective_user
@@ -218,7 +230,7 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== ВЫВОД СРЕДСТВ ==========
 async def withdraw_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Начало вывода"""
+    """Начало вывода - СБРАСЫВАЕТ СТАРЫЕ ДАННЫЕ"""
     user_id = update.effective_user.id
     
     # Сбрасываем старые данные перед новой заявкой
@@ -232,6 +244,11 @@ async def withdraw_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получение ID для вывода"""
     user_id = update.effective_user.id
     text = update.message.text.strip()
+    
+    # Проверяем, есть ли сессия пользователя
+    if user_id not in user_data or user_data[user_id].get('action') != 'withdraw':
+        await update.message.reply_text("❌ Başdan başlamak üçin /start basyň.")
+        return ConversationHandler.END
     
     if validate_parikara_id(text):
         user_data[user_id]['parikara_id'] = text
@@ -248,6 +265,11 @@ async def withdraw_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Получение суммы вывода"""
     user_id = update.effective_user.id
     text = update.message.text.strip()
+    
+    # Проверяем, есть ли сессия пользователя
+    if user_id not in user_data or user_data[user_id].get('action') != 'withdraw':
+        await update.message.reply_text("❌ Başdan başlamak üçin /start basyň.")
+        return ConversationHandler.END
     
     if re.match(r'^\d+$', text):
         amount = text
@@ -268,12 +290,17 @@ async def withdraw_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
     
+    # Проверяем, есть ли сессия пользователя
+    if user_id not in user_data or user_data[user_id].get('action') != 'withdraw':
+        await update.message.reply_text("❌ Başdan başlamak üçin /start basyň.")
+        return ConversationHandler.END
+    
     if validate_phone(text):
         phone = format_phone(text)
         user = update.effective_user
         username = user.username
         app_id = app_counter
-        app_counter += 1  # УВЕЛИЧИВАЕМ, НИКОГДА НЕ СБРАСЫВАЕМ
+        app_counter += 1  # УВЕЛИЧИВАЕМ ГЛОБАЛЬНЫЙ СЧЕТЧИК
         
         # Формируем строку с username или именем
         if username:
@@ -392,46 +419,6 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
                 else:
                     await update.message.reply_text(f"❌ #{app_id} belgili haýyş tapylmady")
                     return
-        
-        # Если это не ответ на сообщение, но 8 цифр
-        else:
-            # Ищем последнюю активную заявку
-            last_app = None
-            for app_id, app in applications.items():
-                if app['type'] == 'deposit' and app['status'] == 'waiting_phone':
-                    last_app = app
-                    break
-            
-            if last_app:
-                phone = format_phone(text)
-                
-                # Отправляем клиенту
-                await context.bot.send_message(
-                    chat_id=last_app['user_id'],
-                    text=(
-                        f"📞 <b>REKWIZITLER #{last_app['id']}</b>\n\n"
-                        f"💳 Nomer: <code>{phone}</code>\n"
-                        f"💰 Summa: {last_app['amount']} TMT\n\n"
-                        f"Töleg geçireniňizden soň skrinşoty ugradyň!\n\n"
-                        f"🆘 Kömek gerek bolsa: {SUPPORT_USERNAME}"
-                    ),
-                    parse_mode='HTML'
-                )
-                
-                # Отправляем подтверждение в группу
-                await update.message.reply_text(
-                    f"✔ Rekwizitler ugradyldy #{last_app['id']}\n\n"
-                    f"👤 Klient: {last_app.get('user_display', last_app['first_name'])}\n"
-                    f"📞 Nomer: {phone}\n"
-                    f"💰 Summa: {last_app['amount']} TMT\n\n"
-                    f"Skrinşot garaşylýar..."
-                )
-                
-                # Обновляем статус
-                last_app['status'] = 'waiting_screenshot'
-                last_app['phone'] = phone
-            else:
-                await update.message.reply_text("❌ Açyk haýyş tapylmady")
 
 # ========== ОБРАБОТКА СКРИНШОТОВ ==========
 async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -585,6 +572,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== ЗАПУСК БОТА ==========
 def main():
+    global app_counter
+    
     # Запускаем веб-сервер
     web_thread = threading.Thread(target=run_flask, daemon=True)
     web_thread.start()
