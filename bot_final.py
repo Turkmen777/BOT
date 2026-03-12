@@ -24,6 +24,7 @@ def run_flask():
 # ========== НАСТРОЙКИ БОТА ==========
 BOT_TOKEN = "8741918027:AAEqpPPZBDO54UZcmxyJb_U4gfuVqc97j5w"
 GROUP_CHAT_ID = -1003759188641
+SUPPORT_USERNAME = "@astra_kassa"  # Контакт поддержки
 
 # Состояния для разговоров
 (PHONE_INPUT, AMOUNT_INPUT, WITHDRAW_PHONE_INPUT, 
@@ -65,16 +66,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка команды /start"""
     user = update.effective_user
     
-    # ТУРКМЕНСКИЕ КНОПКИ
+    # ТУРКМЕНСКИЕ КНОПКИ (ТЕПЕРЬ С КНОПКОЙ ПОДДЕРЖКИ)
     keyboard = [
         [KeyboardButton("💰 Hasaby doldurmak")],
-        [KeyboardButton("💸 Pul çykarmak")]
+        [KeyboardButton("💸 Pul çykarmak")],
+        [KeyboardButton("🆘 Ýardam")]  # Новая кнопка поддержки
     ]
     
     welcome_text = (
         f"Hoş geldiňiz, {user.first_name}! 🤖\n\n"
         "Astra Kassa botyna hoş geldiňiz.\n"
-        "Hasaby doldurmak ýa-da pul çykarmak üçin aşakdaky düwmeleri ulanyň."
+        "Hasaby doldurmak ýa-da pul çykarmak üçin aşakdaky düwmeleri ulanyň.\n\n"
+        "Näsazlyk ýüze çyksa, '🆘 Ýardam' düwmesine basyň."
     )
     
     await update.message.reply_text(
@@ -82,6 +85,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
     return ConversationHandler.END
+
+# ========== КНОПКА ПОДДЕРЖКИ ==========
+async def support_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка кнопки поддержки"""
+    support_text = (
+        f"🆘 <b>ÝARDAM HYZMATY</b>\n\n"
+        f"Näsazlyk ýüze çykan ýa-da soraglaryňyz bar bolsa, \n"
+        f"aşakdaky kontakt arkaly habarlaşyp bilersiňiz:\n\n"
+        f"📞 <b>{SUPPORT_USERNAME}</b>\n\n"
+        f"İş wagty: 24/7"
+    )
+    
+    # Создаем inline кнопку для быстрого перехода
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📨 Habar ýazmak", url=f"https://t.me/{SUPPORT_USERNAME.replace('@', '')}")]
+    ])
+    
+    await update.message.reply_text(
+        support_text,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
 
 # ========== ПОПОЛНЕНИЕ СЧЁТА ==========
 async def deposit_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -162,7 +187,8 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await update.message.reply_text(
             f"✅ Haýyşyňyz #{app_id} kabul edildi!\n\n"
-            "📞 Rekwizitleri garaşyň..."
+            "📞 Rekwizitleri garaşyň...\n\n"
+            f"🆘 Kömek gerek bolsa: {SUPPORT_USERNAME}"
         )
         
         del user_data[user_id]
@@ -271,7 +297,8 @@ async def withdraw_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await update.message.reply_text(
             f"✅ Haýyşyňyz #{app_id} kabul edildi!\n\n"
-            "💸 Pul çykarmak haýyşyňyz işlenilýär."
+            "💸 Pul çykarmak haýyşyňyz işlenilýär.\n\n"
+            f"🆘 Kömek gerek bolsa: {SUPPORT_USERNAME}"
         )
         
         del user_data[user_id]
@@ -316,7 +343,8 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
                                 f"📞 <b>REKWIZITLER #{app_id}</b>\n\n"
                                 f"💳 Nomer: <code>{phone}</code>\n"
                                 f"💰 Summa: {app['amount']} TMT\n\n"
-                                f"Töleg geçireniňizden soň skrinşoty ugradyň!"
+                                f"Töleg geçireniňizden soň skrinşoty ugradyň!\n\n"
+                                f"🆘 Kömek gerek bolsa: {SUPPORT_USERNAME}"
                             ),
                             parse_mode='HTML'
                         )
@@ -360,7 +388,8 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
                         f"📞 <b>REKWIZITLER #{last_app['id']}</b>\n\n"
                         f"💳 Nomer: <code>{phone}</code>\n"
                         f"💰 Summa: {last_app['amount']} TMT\n\n"
-                        f"Töleg geçireniňizden soň skrinşoty ugradyň!"
+                        f"Töleg geçireniňizden soň skrinşoty ugradyň!\n\n"
+                        f"🆘 Kömek gerek bolsa: {SUPPORT_USERNAME}"
                     ),
                     parse_mode='HTML'
                 )
@@ -466,7 +495,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"✅ <b>PLATIO TASSYKLANDY #{app_id}</b>\n\n"
                 f"👤 Klient: {user_display}\n"
                 f"💰 Summa: {app['amount']} TMT\n"
-                f"✅ Tassyklandy: Admin"
+                f"✅ Tassyklandy: Admin\n\n"
+                f"🆘 Kömek gerek bolsa: {SUPPORT_USERNAME}"
             ),
             parse_mode='HTML'
         )
@@ -505,7 +535,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"✅ <b>PUL ÇYKARYLDY #{app_id}</b>\n\n"
                 f"👤 Klient: {user_display}\n"
                 f"💰 Summa: {app['amount']} TMT\n\n"
-                f"Hyzmat üçin sag boluň! 🤝"
+                f"Hyzmat üçin sag boluň! 🤝\n\n"
+                f"🆘 Kömek gerek bolsa: {SUPPORT_USERNAME}"
             ),
             parse_mode='HTML'
         )
@@ -534,10 +565,8 @@ def main():
     print("=" * 60)
     print("🤖 ASTRA KASSA BOT - TÜRKMENÇE VERSION")
     print("📱 Işe başlady! 24/7 işleýär")
-    print("💰 KNOpkalar: 'Hasaby doldurmak' we 'Pul çykarmak'")
-    print("👥 ADMIN FUNKSIÝALARY:")
-    print("   • 8 san ýazsaňyz -> rekwizitler gidýär")
-    print("   • Skrinşot gelende: ✅ Töleg tassykla")
+    print("💰 KNOpkalar: 'Hasaby doldurmak', 'Pul çykarmak', '🆘 Ýardam'")
+    print(f"👥 Ýardam: {SUPPORT_USERNAME}")
     print("=" * 60)
     
     # Создаем приложение бота
@@ -566,6 +595,7 @@ def main():
     
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.Regex("^🆘 Ýardam$"), support_button))
     application.add_handler(deposit_conv)
     application.add_handler(withdraw_conv)
     application.add_handler(MessageHandler(filters.PHOTO, handle_screenshot))
