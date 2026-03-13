@@ -41,8 +41,8 @@ logger = logging.getLogger(__name__)
 user_data = {}
 applications = {}
 app_counter = 1000
-pending_registrations = {}
-registered_users = {}
+registered_users = {}  # Только после подтверждения админом
+pending_users = {}     # Ожидают подтверждения
 
 # ========== ФУНКЦИИ ==========
 def validate_parikara_id(text):
@@ -83,6 +83,7 @@ def reset_user_data(user_id):
         del user_data[user_id]
 
 def is_registered(user_id):
+    """Проверяет, есть ли пользователь в registered_users (подтверждённых)"""
     return user_id in registered_users
 
 # ========== START ==========
@@ -92,9 +93,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Очищаем контекст при новом старте
     context.user_data.clear()
     
+    # Если пользователь уже подтверждён - показываем меню
     if is_registered(user_id):
         return await show_main_menu(update, context)
     
+    # Если пользователь в ожидании (pending) - просто говорим ждать
+    if user_id in pending_users:
+        await update.message.reply_text(
+            f"⏳ Siz eýýäm registrasiýa etdiňiz.\n"
+            f"Parolyňyz admin tarapyndan barlanylýar.\n"
+            f"Habarlaşmak üçin: {SUPPORT_USERNAME}"
+        )
+        return ConversationHandler.END
+    
+    # Новый пользователь - спрашиваем
     keyboard = [
         [KeyboardButton("✅ Hawa, men müşderi")],
         [KeyboardButton("❌ Ýok, täze registrasiýa")]
@@ -107,6 +119,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_CLIENT
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает главное меню для подтверждённых пользователей"""
     user = update.effective_user
     
     keyboard = [
@@ -160,9 +173,7 @@ async def login_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if validate_phone(text):
         phone = format_phone(text)
-        # Сохраняем телефон в context.user_data (он живёт дольше)
         context.user_data['login_phone'] = phone
-        # Счётчик попыток ввода пароля
         context.user_data['login_attempts'] = 0
         
         await update.message.reply_text(
@@ -182,19 +193,17 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     password = update.message.text.strip()
     
-    # Увеличиваем счётчик попыток
     if 'login_attempts' not in context.user_data:
         context.user_data['login_attempts'] = 0
     context.user_data['login_attempts'] += 1
     
-    # Проверяем, есть ли телефон в контексте
     if 'login_phone' not in context.user_data:
         await update.message.reply_text("❌ Başdan başlamak üçin /start basyň.")
         return ConversationHandler.END
     
     login_phone = context.user_data['login_phone']
     
-    # Ищем пользователя с таким телефоном в registered_users
+    # Ищем пользователя с таким телефоном в registered_users (подтверждённых)
     found_user = None
     for uid, data in registered_users.items():
         if data['phone'] == login_phone:
@@ -202,11 +211,10 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
             break
     
     if found_user and found_user['password'] == password:
-        # Правильный пароль - очищаем контекст и показываем меню
+        # Правильный пароль - даем доступ
         context.user_data.clear()
-        # Сохраняем ID пользователя как зарегистрированного
+        # Если пользователь заходит с другого устройства, сохраняем его ID
         if user_id not in registered_users:
-            # Если пользователь заходит с другим аккаунтом, но правильным паролем
             registered_users[user_id] = found_user
         
         await update.message.reply_text("✅ Giriş üstünlikli!")
@@ -216,7 +224,6 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
         attempts = context.user_data['login_attempts']
         
         if attempts >= 5:
-            # После 5 попыток - блокировка
             await update.message.reply_text(
                 f"❌ 5 gezek ýalňyş parol!\n"
                 f"Hasabyňyz wagtlaýyn blokirlendi.\n"
@@ -225,7 +232,6 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
             return ConversationHandler.END
         else:
-            # Снова спрашиваем пароль
             remaining = 5 - attempts
             await update.message.reply_text(
                 f"❌ Ýalňyş parol! {remaining} gezek synanyşyk galdy.\n"
@@ -261,7 +267,6 @@ async def reg_parikara_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
     
-    # Проверяем, есть ли сессия
     if user_id not in user_data or 'phone' not in user_data[user_id]:
         await update.message.reply_text("❌ Başdan başlamak üçin /start basyň.")
         return ConversationHandler.END
@@ -273,8 +278,8 @@ async def reg_parikara_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         username = user.username or "ýok"
         
-        # Сохраняем в registered_users (сразу регистрируем)
-        registered_users[user_id] = {
+        # Сохраняем в pending_users (ожидают подтверждения)
+        pending_users[user_id] = {
             'user_id': user_id,
             'username': username,
             'first_name': user.first_name,
@@ -292,7 +297,8 @@ async def reg_parikara_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📞 Telefon: {phone}\n"
             f"🆔 Parikara ID: {parikara_id}\n"
             f"🔑 PAROL: <code>{password}</code>\n"
-            f"⏰ Wagt: {registered_users[user_id]['registered_date']}"
+            f"⏰ Wagt: {pending_users[user_id]['registered_date']}\n\n"
+            f"⚠️ <b>PAROLY DIŇE MÜŞDERÄ BERIŇ!</b>"
         )
         
         await context.bot.send_message(
@@ -301,19 +307,21 @@ async def reg_parikara_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode='HTML'
         )
         
-        # Клиенту - только логин
+        # Клиенту - только информация, НИКАКИХ КНОПОК
         await update.message.reply_text(
             f"✅ <b>REGISTRASIÝA ÜSTÜNLIKLI</b>\n\n"
             f"📞 Siziň loginiňiz: {phone}\n\n"
             f"🔐 <b>PAROLYŇYZ ADMINDA</b>\n"
             f"Parolyňyzy almak üçin admin bilen habarlaşyň:\n"
-            f"{SUPPORT_USERNAME}",
+            f"{SUPPORT_USERNAME}\n\n"
+            f"⚠️ <b>Paroly alanyňyzdan soň, /start basyp giriň.</b>",
             parse_mode='HTML'
         )
         
         # Очищаем временные данные
         del user_data[user_id]
         
+        # Завершаем разговор - пользователь НЕ ПОЛУЧАЕТ ДОСТУП
         return ConversationHandler.END
     else:
         await update.message.reply_text(
@@ -322,8 +330,22 @@ async def reg_parikara_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return REG_PARIKARA_ID
 
+# ========== АДМИН: ПОДТВЕРЖДЕНИЕ РЕГИСТРАЦИИ ==========
+# (Эту функцию можно вызвать отдельной командой /confirm user_id)
+async def confirm_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда для админа: /confirm user_id"""
+    # Здесь будет логика подтверждения
+    pass
+
 # ========== КНОПКА ПОДДЕРЖКИ ==========
 async def support_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка кнопки поддержки - ТОЛЬКО ДЛЯ ПОДТВЕРЖДЁННЫХ"""
+    user_id = update.effective_user.id
+    
+    if not is_registered(user_id):
+        await update.message.reply_text("❌ Öň registrasiýadan geçmeli! /start basyň.")
+        return
+    
     support_text = (
         f"🆘 <b>ÝARDAM HYZMATY</b>\n\n"
         f"Näsazlyk ýüze çykan ýa-da soraglaryňyz bar bolsa, \n"
@@ -342,7 +364,7 @@ async def support_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboard
     )
 
-# ========== ПОПОЛНЕНИЕ СЧЁТА ==========
+# ========== ПОПОЛНЕНИЕ СЧЁТА (ТОЛЬКО ДЛЯ ПОДТВЕРЖДЁННЫХ) ==========
 async def deposit_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
@@ -444,7 +466,7 @@ async def deposit_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Ýalňyş summa! Iň az 30 TMT bolmaly.\nTäzeden ýazyň:")
         return AMOUNT_INPUT
 
-# ========== ВЫВОД СРЕДСТВ ==========
+# ========== ВЫВОД СРЕДСТВ (ТОЛЬКО ДЛЯ ПОДТВЕРЖДЁННЫХ) ==========
 async def withdraw_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
@@ -799,10 +821,10 @@ def main():
     time.sleep(2)
     
     print("=" * 60)
-    print("🤖 ASTRA KASSA BOT - DOLY VERSION")
+    print("🤖 ASTRA KASSA BOT - REGISTRASIÝA SYSTEMASY")
     print("📱 Işe başlady! 24/7 işleýär")
-    print("🔐 Giriş: 5 gezek synanyşyk")
-    print("📞 Ýardam: @astra_kassa")
+    print("🔐 Registrasiýa: Parol diňe admin gruppa")
+    print("👥 Müşderi: Parol almaly, soňra girip biler")
     print("=" * 60)
     
     application = Application.builder().token(BOT_TOKEN).build()
