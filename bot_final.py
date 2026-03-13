@@ -333,9 +333,12 @@ async def withdraw_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"<b>Pul geçirilenden soň:</b>"
         )
         
-        # Кнопка для подтверждения вывода
+        # Кнопки для подтверждения/отклонения вывода
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ Töleg tassykla", callback_data=f"confirm_withdraw_{app_id}")]
+            [
+                InlineKeyboardButton("✅ Tassykla", callback_data=f"confirm_withdraw_{app_id}"),
+                InlineKeyboardButton("❌ Ret et", callback_data=f"reject_withdraw_{app_id}")
+            ]
         ])
         
         await context.bot.send_message(
@@ -448,9 +451,12 @@ async def handle_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Сохраняем file_id скриншота
             applications[app_id]['screenshot_id'] = file_id
             
-            # Отправляем в группу с кнопкой подтверждения
+            # Отправляем в группу с кнопками подтверждения/отклонения
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ Töleg tassykla", callback_data=f"approve_{app_id}")]
+                [
+                    InlineKeyboardButton("✅ Tassykla", callback_data=f"approve_{app_id}"),
+                    InlineKeyboardButton("❌ Ret et", callback_data=f"reject_{app_id}")
+                ]
             ])
             
             caption = (
@@ -483,6 +489,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data.split('_')
     action = data[0]
     
+    # ===== ДЛЯ СКРИНШОТОВ =====
     if action == 'approve':
         app_id = int(data[1])
         
@@ -503,7 +510,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
             chat_id=app['user_id'],
             text=(
-                f"✅ <b>SARGYT TASSYKLANDY #{app_id}</b>\n\n"
+                f"✅ <b>TÖLEG TASSYKLANDY #{app_id}</b>\n\n"
                 f"👤 Klient: {user_display}\n"
                 f"💰 Summa: {app['amount']} TMT\n"
                 f"✅ Tassyklandy: Admin\n\n"
@@ -514,7 +521,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Обновляем сообщение в группе
         await query.edit_message_caption(
-            caption=query.message.caption + f"\n\n✅ <b>SARGYT TASSYKLANDY #{app_id}</b>\n\n👤 Klient: {user_display}\n💰 Summa: {app['amount']} TMT\n✅ Tassyklandy: Admin",
+            caption=query.message.caption + f"\n\n✅ <b>TÖLEG TASSYKLANDY #{app_id}</b>\n\n👤 Klient: {user_display}\n💰 Summa: {app['amount']} TMT\n✅ Tassyklandy: Admin",
             parse_mode='HTML'
         )
         
@@ -524,6 +531,48 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"✅ #{app_id} tassyklanyldy"
         )
     
+    elif action == 'reject' and len(data) == 2:  # Для скриншотов
+        app_id = int(data[1])
+        
+        if app_id not in applications:
+            await query.edit_message_caption("❌ Bu haýyş tapylmady")
+            return
+        
+        app = applications[app_id]
+        app['status'] = 'rejected'
+        
+        # Получаем display имени для клиента
+        if app.get('username'):
+            user_display = f"@{app['username']}"
+        else:
+            user_display = app['first_name']
+        
+        # Отправляем сообщение клиенту
+        await context.bot.send_message(
+            chat_id=app['user_id'],
+            text=(
+                f"❌ <b>TÖLEG KABUL EDILMEDI #{app_id}</b>\n\n"
+                f"👤 Klient: {user_display}\n"
+                f"💰 Summa: {app['amount']} TMT\n\n"
+                f"Tölegiňiz tassyklanmady. \n"
+                f"Ýardam üçin: {SUPPORT_USERNAME}"
+            ),
+            parse_mode='HTML'
+        )
+        
+        # Обновляем сообщение в группе
+        await query.edit_message_caption(
+            caption=query.message.caption + f"\n\n❌ <b>TÖLEG KABUL EDILMEDI #{app_id}</b>\n\n👤 Klient: {user_display}\n💰 Summa: {app['amount']} TMT\n❌ Ret edildi: Admin",
+            parse_mode='HTML'
+        )
+        
+        # Отправляем подтверждение в группу
+        await context.bot.send_message(
+            chat_id=GROUP_CHAT_ID,
+            text=f"❌ #{app_id} ret edildi"
+        )
+    
+    # ===== ДЛЯ ВЫВОДА СРЕДСТВ =====
     elif action == 'confirm' and data[1] == 'withdraw':
         app_id = int(data[2])
         
@@ -556,6 +605,39 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=query.message.text + f"\n\n✅ <b>TASSYKLANDY #{app_id}</b>\n\n👤 Klient: {user_display}\n💰 Summa: {app['amount']} TMT",
             parse_mode='HTML'
         )
+    
+    elif action == 'reject' and data[1] == 'withdraw':
+        app_id = int(data[2])
+        
+        if app_id not in applications:
+            await query.edit_message_text("❌ Bu haýyş tapylmady")
+            return
+        
+        app = applications[app_id]
+        app['status'] = 'rejected'
+        
+        # Получаем display имени для клиента
+        if app.get('username'):
+            user_display = f"@{app['username']}"
+        else:
+            user_display = app['first_name']
+        
+        await context.bot.send_message(
+            chat_id=app['user_id'],
+            text=(
+                f"❌ <b>PUL ÇYKARYLMADY #{app_id}</b>\n\n"
+                f"👤 Klient: {user_display}\n"
+                f"💰 Summa: {app['amount']} TMT\n\n"
+                f"Pul çykarmak haýyşyňyz kabul edilmedi.\n"
+                f"Ýardam üçin: {SUPPORT_USERNAME}"
+            ),
+            parse_mode='HTML'
+        )
+        
+        await query.edit_message_text(
+            text=query.message.text + f"\n\n❌ <b>RET EDILDI #{app_id}</b>\n\n👤 Klient: {user_display}\n💰 Summa: {app['amount']} TMT",
+            parse_mode='HTML'
+        )
 
 # ========== ОТМЕНА ==========
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -585,6 +667,7 @@ def main():
     print("💰 KNOpkalar: 'Hasaby doldurmak', 'Pul çykarmak', '🆘 Ýardam'")
     print(f"👥 Ýardam: {SUPPORT_USERNAME}")
     print(f"📊 Nomeraşdyryş: {app_counter}-den başlaýar we hemişe artýar")
+    print("✅ Täze: Ret etmek knoppkalary goşuldy!")
     print("=" * 60)
     
     # Создаем приложение бота
