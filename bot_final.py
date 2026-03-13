@@ -89,6 +89,9 @@ def is_registered(user_id):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
+    # Очищаем контекст при новом старте
+    context.user_data.clear()
+    
     if is_registered(user_id):
         return await show_main_menu(update, context)
     
@@ -157,7 +160,10 @@ async def login_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if validate_phone(text):
         phone = format_phone(text)
-        user_data[user_id] = {'login_phone': phone}
+        # Сохраняем телефон в context.user_data (он живёт дольше)
+        context.user_data['login_phone'] = phone
+        # Счётчик попыток ввода пароля
+        context.user_data['login_attempts'] = 0
         
         await update.message.reply_text(
             f"✅ Telefon nomeri kabul edildi\n\n"
@@ -167,7 +173,8 @@ async def login_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(
             "❌ Ýalňyş format!\n"
-            "Dogry format: +99365123456 ýa-da 65123456"
+            "Dogry format: +99365123456 ýa-da 65123456\n"
+            "Täzeden ýazyň:"
         )
         return LOGIN_PHONE
 
@@ -175,15 +182,56 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     password = update.message.text.strip()
     
-    if user_id in registered_users and registered_users[user_id]['password'] == password:
+    # Увеличиваем счётчик попыток
+    if 'login_attempts' not in context.user_data:
+        context.user_data['login_attempts'] = 0
+    context.user_data['login_attempts'] += 1
+    
+    # Проверяем, есть ли телефон в контексте
+    if 'login_phone' not in context.user_data:
+        await update.message.reply_text("❌ Başdan başlamak üçin /start basyň.")
+        return ConversationHandler.END
+    
+    login_phone = context.user_data['login_phone']
+    
+    # Ищем пользователя с таким телефоном в registered_users
+    found_user = None
+    for uid, data in registered_users.items():
+        if data['phone'] == login_phone:
+            found_user = data
+            break
+    
+    if found_user and found_user['password'] == password:
+        # Правильный пароль - очищаем контекст и показываем меню
+        context.user_data.clear()
+        # Сохраняем ID пользователя как зарегистрированного
+        if user_id not in registered_users:
+            # Если пользователь заходит с другим аккаунтом, но правильным паролем
+            registered_users[user_id] = found_user
+        
         await update.message.reply_text("✅ Giriş üstünlikli!")
         return await show_main_menu(update, context)
     else:
-        await update.message.reply_text(
-            f"❌ Ýalňyş parol!\n"
-            f"Ýardam: {SUPPORT_USERNAME}"
-        )
-        return ConversationHandler.END
+        # Неправильный пароль
+        attempts = context.user_data['login_attempts']
+        
+        if attempts >= 5:
+            # После 5 попыток - блокировка
+            await update.message.reply_text(
+                f"❌ 5 gezek ýalňyş parol!\n"
+                f"Hasabyňyz wagtlaýyn blokirlendi.\n"
+                f"Ýardam: {SUPPORT_USERNAME}"
+            )
+            context.user_data.clear()
+            return ConversationHandler.END
+        else:
+            # Снова спрашиваем пароль
+            remaining = 5 - attempts
+            await update.message.reply_text(
+                f"❌ Ýalňyş parol! {remaining} gezek synanyşyk galdy.\n"
+                f"🔑 Parolyňyzy täzeden ýazyň:"
+            )
+            return LOGIN_PASSWORD
 
 # ========== РЕГИСТРАЦИЯ: ТЕЛЕФОН ==========
 async def reg_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -203,7 +251,8 @@ async def reg_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(
             "❌ Ýalňyş format!\n"
-            "Dogry format: +99365123456 ýa-da 65123456"
+            "Dogry format: +99365123456 ýa-da 65123456\n"
+            "Täzeden ýazyň:"
         )
         return REG_PHONE
 
@@ -739,8 +788,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     reset_user_data(user_id)
-    if context.user_data:
-        context.user_data.clear()
+    context.user_data.clear()
     await update.message.reply_text("❌ Amal ýatyryldy.\nTäzeden başlamak üçin /start basyň.")
     return ConversationHandler.END
 
@@ -753,7 +801,7 @@ def main():
     print("=" * 60)
     print("🤖 ASTRA KASSA BOT - DOLY VERSION")
     print("📱 Işe başlady! 24/7 işleýär")
-    print("🔐 Registrasiýa: Telefon + Parikara ID")
+    print("🔐 Giriş: 5 gezek synanyşyk")
     print("📞 Ýardam: @astra_kassa")
     print("=" * 60)
     
