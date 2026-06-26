@@ -21,9 +21,9 @@ def run_flask():
     app.run(host='0.0.0.0', port=10000, debug=False, use_reloader=False)
 
 # ========== НАСТРОЙКИ БОТА ==========
-BOT_TOKEN = "8741918027:AAEqpPPZBDO54UZcmxyJb_U4gfuVqc97j5"
-GROUP_CHAT_ID = -1003759188641
-ADMIN_IDS = [8444800411]
+BOT_TOKEN = "8732092975:AAE4OMg6eAwFaKtkVa4aO3yE_LQC9SyJZuw"
+GROUP_CHAT_ID = -1005235064939
+ADMIN_IDS = [8825795410]
 MIN_AMOUNT = 50
 
 logging.basicConfig(level=logging.INFO)
