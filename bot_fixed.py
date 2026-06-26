@@ -4,9 +4,9 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboard
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes, ConversationHandler
 
 # ========== НАСТРОЙКИ ==========
-BOT_TOKEN = "8741918027:AAEqpPPZBDO54UZcmxyJb_U4gfuVqc97j5"  # ⚠️ ВАШ ТОКЕН
-GROUP_CHAT_ID = -1003759188641
-ADMIN_IDS = [8444800411]
+BOT_TOKEN = "8732092975:AAE4OMg6eAwFaKtkVa4aO3yE_LQC9SyJZuw"  # ⚠️ ВАШ ТОКЕН
+GROUP_CHAT_ID = -1005235064939
+ADMIN_IDS = [8825795410]
 MIN_AMOUNT = 50
 
 logging.basicConfig(level=logging.INFO)
